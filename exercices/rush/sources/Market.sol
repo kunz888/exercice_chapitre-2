@@ -32,7 +32,7 @@ event  DeleteOffer(Offer indexed item);
 event  UpdateOffer(Offer indexed item);
 event TransactionAfterTimeLock(address sellerAddress,uint256 pricewithout_5percent,uint256 blockTimestamp , uint256 item_timestamp);
 bool addNewOfferforTheSameItem=true; 
-bool sendNow=true;   
+ 
 uint public timeLock=0 ;
 Article [] public ListArticle;
 
@@ -57,7 +57,7 @@ function getArticle(string memory _Libelle,string memory _nomProprio) public  re
 }
 
 function getIndexArticle(string memory _Libelle,string memory _nomProprio) public view returns (uint256) {
-   uint256 index;
+   uint256 index=0;
    Article[] memory memoryArticle=ListArticle;
       for (uint256 i = 0; i < memoryArticle.length; i++) 
           {
@@ -99,6 +99,7 @@ Offer [] public ListOffer;
 function getOffer(string memory _Libelle,string memory _nomCustomer) public  returns (Offer memory) {
     Offer [] memory memoryOffer=ListOffer;
     Offer memory o;
+    
       for (uint i = 0; i < memoryOffer.length; i++) 
           {
             if(compareStrings(_Libelle,memoryOffer[i].libelle) && compareStrings(_nomCustomer,memoryOffer[i].nomCustomer))
@@ -158,7 +159,7 @@ emit AddOffer(prop);
 //send money to contract
 //bool sent = payable(address(this)).send(_prixAchat);
 //require(sent, "send failed");
-require(msg.value>=0,"Pas assez d'argent");
+require(msg.value>=_prixAchat,"Pas assez d'argent");
 
 }
 }
@@ -169,8 +170,9 @@ prop=getOffer(_Libelle,_nomCustomer);
 string memory nom=prop.nomCustomer;
 address customeraddress=prop.customerAddress;
 string memory libelle=prop.libelle;
-require(msg.sender==customeraddress,"Not the same customer");
-emit CheckCustomer(msg.sender,customeraddress);
+address selleraddress=prop.item.sellerAddress;
+require(msg.sender==selleraddress,"Not the same Seller");
+emit CheckCustomer(msg.sender,selleraddress);
 
 uint256 prix=prop.prixPopositionAchat;
 prop.customerAddress=customeraddress;
@@ -194,14 +196,15 @@ item.sellerAddress=_a;
 item.isPaid=true;
 item.timeLock=0;
 prop.item=item;
-    for (uint i = 0; i < ListOffer.length; i++) 
+Offer [] memory memoryOffer=ListOffer;
+    for (uint i = 0; i < memoryOffer.length; i++) 
           {
-            if(compareStrings(_Libelle,ListOffer[i].libelle) && compareStrings(_nomCustomer,ListOffer[i].nomCustomer))
+            if(compareStrings(_Libelle,memoryOffer[i].libelle) && compareStrings(_nomCustomer,memoryOffer[i].nomCustomer))
             {
              emit UpdateOffer(prop);
              ListOffer[i]=prop;
             }
-             if(compareStrings(prop.item.libelle,ListOffer[i].item.libelle) && compareStrings(_nomCustomer,ListOffer[i].nomCustomer) && ListOffer[i].isOk==false)
+             if(compareStrings(prop.item.libelle,memoryOffer[i].item.libelle) && compareStrings(_nomCustomer,memoryOffer[i].nomCustomer) && memoryOffer[i].isOk==false)
             {
               emit DeleteOffer(ListOffer[i]);
              RemoveOffer(i);
@@ -214,7 +217,8 @@ addNewOfferforTheSameItem=false;
 else
 {
 //return the money to the customer
-    bool sent = payable(customeraddress).send(prix);
+  require(msg.sender==selleraddress,"Not the same Seller");
+  bool sent = payable(customeraddress).send(prix);
   require(sent, "send failed");
   emit Transaction(customeraddress,prix);
 }
@@ -237,12 +241,12 @@ prop.libelle=libelle;
 prop.isOk=true;
   require(msg.sender==prop.customerAddress);
   
-  uint256 fivepercent=(prix/100)*5;
+  uint256 amountForSeller=prix*95/100;
   if(_nbDays==0)
   {
-  bool sent = payable(prop.item.sellerAddress).send(prix-fivepercent);
+  bool sent = payable(prop.item.sellerAddress).send(amountForSeller);
   require(sent, "send failed");
-  emit Transaction(prop.item.sellerAddress,prix-fivepercent);
+  emit Transaction(prop.item.sellerAddress,amountForSeller);
 
   }
   else 
@@ -282,12 +286,12 @@ function claimMoneyForSeller(string memory _Libelle,string memory _nomCustomer)p
   require(msg.sender==prop.item.sellerAddress);
   require(block.timestamp  > prop.item.timeLock);
    uint prix=prop.item.price;
-  uint fivepercent=(prix/100)*5;
-  emit TransactionAfterTimeLock(prop.item.sellerAddress,prix-fivepercent,block.timestamp , prop.item.timeLock);
+  uint amountForSeller=prix*95/100;
+  emit TransactionAfterTimeLock(prop.item.sellerAddress,amountForSeller,block.timestamp , prop.item.timeLock);
 
-   bool sent = payable(prop.item.sellerAddress).send(prix-fivepercent);
+   bool sent = payable(prop.item.sellerAddress).send(amountForSeller);
    require(sent, "send failed");
-   emit Transaction(prop.item.sellerAddress,prix-fivepercent);
+   emit Transaction(prop.item.sellerAddress,amountForSeller);
 
 }
 }
